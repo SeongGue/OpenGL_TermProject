@@ -21,9 +21,9 @@ void Camera_change();
 void createCylinder(GLfloat centerx, GLfloat centery, GLfloat centerz, GLfloat radius, GLfloat h);//원기둥
 void draw_canon();
 void draw_ground();
-void draw_building();
+//void draw_building();
 void draw_shell();
-void castle();
+void draw_castle(int castle_num);
 
 void shellArc();//포물선 운동 함수
 struct Point;
@@ -35,7 +35,7 @@ float v = 0;
 
 enum { XY_SURFACE = 0, PERSPECTIVE = 1, MULTY_VIEW = 2 };
 enum {ORBIT_SET = 0, GAGE_CHARGE = 1, FIRE = 2,
-		UP, DOWN, STOP};//캐논 열거형
+		UP, DOWN, STOP, RIGHT, LEFT};//캐논 열거형
 
 struct Point
 {
@@ -53,7 +53,7 @@ int w1 = 0, h1 = 0;
 
 //======캐논 변수==========//
 int canon_state = ORBIT_SET;
-int orbit_up_down = STOP;
+int set_dir = STOP;
 float canon_angle = 15;
 float save_angle = 0;
 Point cannon = { 0, 0, 0, 100, 100, 100 };
@@ -62,17 +62,21 @@ Point cannon = { 0, 0, 0, 100, 100, 100 };
 //float x = -X_END, y = -Y_END + 1000 , z = 0; //1픽셀당 1m
 float missile_speed = 0; //초당 1000미터
 float xz = 0;
-float xy_angle = 0;
+float xy_angle = PIE/15;
 float xz_angle = 0;
 float shell_angle = PIE/12;
 
 //Point missile_c = {-X_END, -Y_END + 1000, 0, 50, 50, 50};
 Point missile_c = { -4300, -4400, 0, 50, 50, 50 };
-Point building_c = { 5000, GROUND, 0, 1000,1000,1000 };
+Point building_c[3] = { { 4000, GROUND + 500, 0, 1000, 1000, 1000 },
+						{ 2500, GROUND + 500, 3500, 1000, 1000, 1000 }, 
+						{ 2500, GROUND + 500, -3500, 1000, 1000, 1000 }
+					};
 //Point b = { 0, 0, 0, 100,100,100 };
 
 float angle = 0;
 float angle_x = 0;
+float angle_z = 0;
 
 
 void main(int argc, char *argv[])
@@ -100,16 +104,20 @@ GLvoid drawScene(GLvoid)
 
 	glRotatef(angle, 0, 1, 0);
 	glRotatef(angle_x, 1, 0, 0);
+	glRotatef(angle_z, 0, 0, 1);
 
 	draw_ground();
 	draw_canon();
-	draw_building();
+	//draw_building();
 	draw_shell();
-
+	for (int i = 0; i < 3; i++)
+		draw_castle(i);
 
 	//printf("%d \n", collide(test_a, test_b));
-	printf("%f \n", missile_speed);
+	printf("speed = %f \n", missile_speed);
 	//printf("%d \n", orbit_up_down);
+	printf("xy_angle = %f \n", xy_angle);
+	printf("xz_angle = %f \n", xz_angle);
 	glutSwapBuffers();
 }
 
@@ -155,6 +163,14 @@ void keyboard(unsigned char key, int x, int y)
 	{
 		angle_x -= 15;
 	}
+	if (key == 'Z')
+	{
+		angle_z += 15;
+	}
+	if (key == 'z')
+	{
+		angle_z -= 15;
+	}
 }
 
 void keyUp(unsigned char key, int x, int y)
@@ -168,16 +184,24 @@ void keyUp(unsigned char key, int x, int y)
 void specialKey(int key, int x, int y)
 {
 	if (key == GLUT_KEY_UP)
-		orbit_up_down = UP;
+		set_dir = UP;
 	if (key == GLUT_KEY_DOWN)
-		orbit_up_down = DOWN;
+		set_dir = DOWN;
+	if (key == GLUT_KEY_LEFT)
+		set_dir = LEFT;
+	if (key == GLUT_KEY_RIGHT)
+		set_dir = RIGHT;
 }
 void specialkeyUp(int key, int x, int y)
 {
 	if (key == GLUT_KEY_UP)
-		orbit_up_down = STOP;
-	if (key == GLUT_KEY_DOWN)
-		orbit_up_down = STOP;
+		set_dir = STOP;
+	else if (key == GLUT_KEY_DOWN)
+		set_dir = STOP;
+	else if (key == GLUT_KEY_LEFT)
+		set_dir = STOP;
+	else if (key == GLUT_KEY_RIGHT)
+		set_dir = STOP;
 }
 
 void Timerfunction(int value)
@@ -188,13 +212,21 @@ void Timerfunction(int value)
 		missile_speed += 50;
 	if (canon_state == ORBIT_SET)
 	{
-		if (orbit_up_down == UP){
-			/*canon_angle += 1;
-			shell_angle += PIE/180;*/
+		if (set_dir == UP){
+			if (xy_angle < PIE / 2)
+				xy_angle += PIE / 360;
 		}
-		else if (orbit_up_down == DOWN){
-			/*canon_angle -= 1;
-			shell_angle -= PIE / 180;*/
+		else if (set_dir == DOWN){
+			if (xy_angle > 0)
+				xy_angle -= PIE / 360;
+		}
+		else if (set_dir == LEFT){
+			if (xz_angle > -PIE / 4)
+				xz_angle -= PIE / 360;
+		}
+		else if (set_dir == RIGHT){
+			if (xz_angle < PIE / 4)
+				xz_angle += PIE / 360;
 		}
 		else
 			canon_angle = canon_angle;
@@ -216,44 +248,11 @@ void draw_ground()
 	glEnd();
 }
 
-void draw_building()
-{
-	glPushMatrix();//건물
-	{
-		glTranslatef(building_c.x, building_c.y, building_c.z);
-		glColor3f(0, 0, 1);
-		glutSolidCube(1000);
-	}
-	glPopMatrix();
-}
 
 void draw_shell()
 {
 	glPushMatrix();//포탄
 	{
-		//if (canon_state == ORBIT_SET || canon_state == GAGE_CHARGE)
-		//{
-		//	if (camera_viewpoint == PERSPECTIVE)
-		//	{
-		//		glTranslatef(-400, -50, 0);
-		//		glRotatef(canon_angle, 0, 1, 0);
-		//		glTranslatef(400, 50, 0);
-		//	}
-		//	else
-		//	{
-		//		glTranslatef(-400, -50, 0);
-		//		glRotatef(canon_angle, 0, 0, 1);
-		//		glTranslatef(400, 50, 0);
-		//		save_angle = canon_angle;
-		//	}
-		//}
-		//else
-		//{
-		//	glTranslatef(-400, -50, 0);
-		//	glRotatef(save_angle, 0, 0, 1);
-		//	glTranslatef(400, 50, 0);
-		//}
-
 		glTranslatef(missile_c.x, missile_c.y, missile_c.z);
 		glColor3f(1, 0, 0);
 		glutSolidCube(50);
@@ -337,8 +336,6 @@ void Camera_change()
 void shellArc()
 {
 	t = 0.025;
-	//xy_angle = PIE / 6;
-	xz_angle = 0;
 	v += 200 * t;
 	xz = missile_speed*cos(xy_angle);
 	missile_c.x += xz*cos(xz_angle) * t;
@@ -426,11 +423,12 @@ void createCylinder(GLfloat centerx, GLfloat centery, GLfloat centerz, GLfloat r
 }
 
 
-void castle()
+void draw_castle(int castle_num)
 {
 	glPushMatrix();
 	{
-		glTranslatef(0, -5000, 0);
+		glTranslatef(building_c[castle_num].x, building_c[castle_num].y, building_c[castle_num].z);
+		glScalef(0.2, 0.2, 0.2);
 		//가운데성
 		glPushMatrix();
 		{
@@ -630,4 +628,14 @@ void castle()
 		glPopMatrix();
 	}
 	glPopMatrix();
+
+	glPushMatrix();//충돌 박스
+	{
+		glTranslatef(building_c[castle_num].x, building_c[castle_num].y + 500, building_c[castle_num].z);
+		glColor3f(0, 0, 1);
+		glutSolidCube(1000);
+	}
+	glPopMatrix();
+
+	printf("castle[%d] = %d \n", castle_num, collide(missile_c, building_c[castle_num]));
 }
